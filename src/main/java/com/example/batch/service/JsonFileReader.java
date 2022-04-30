@@ -18,7 +18,7 @@ public class JsonFileReader implements StepExecutionListener, ItemReader<JsonNod
 
     private ObjectMapper objectMapper;
 
-    private String fileName;
+    private final String fileName;
 
     public JsonFileReader(String file) {
         if (file.matches("^file:(.*)"))
@@ -52,7 +52,7 @@ public class JsonFileReader implements StepExecutionListener, ItemReader<JsonNod
         String line = reader.readLine();
 
         if (line != null)
-            return objectMapper.readTree(reader.readLine());
+            return objectMapper.readTree(line);
         else
             return null;
     }

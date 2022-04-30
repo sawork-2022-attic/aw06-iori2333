@@ -18,13 +18,14 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.util.ResourceUtils;
+
+import java.io.FileNotFoundException;
 
 
-@Configuration
-@EnableBatchProcessing
+//@Configuration
+//@EnableBatchProcessing
 public class BatchConfig {
-
-
     @Autowired
     public JobBuilderFactory jobBuilderFactory;
 
@@ -33,8 +34,9 @@ public class BatchConfig {
 
 
     @Bean
-    public ItemReader<JsonNode> itemReader() {
-        return new JsonFileReader("/home/java/meta_Clothing_Shoes_and_Jewelry.json");
+    public ItemReader<JsonNode> itemReader() throws FileNotFoundException {
+        var file = ResourceUtils.getFile("classpath:data/meta_Magazine_Subscriptions_100.json");
+        return new JsonFileReader(file.getPath());
     }
 
     @Bean
@@ -49,29 +51,30 @@ public class BatchConfig {
 
     @Bean
     protected Step processProducts(ItemReader<JsonNode> reader, ItemProcessor<JsonNode, Product> processor, ItemWriter<Product> writer) {
-        return stepBuilderFactory.get("processProducts").<JsonNode, Product>chunk(20)
-                .reader(reader)
-                .processor(processor)
-                .writer(writer)
-                .taskExecutor(taskExecutor())
-                .build();
+        return stepBuilderFactory
+            .get("processProducts")
+            .<JsonNode, Product>chunk(20)
+            .reader(reader)
+            .processor(processor)
+            .writer(writer)
+            .taskExecutor(taskExecutor())
+            .build();
     }
 
     @Bean
-    public Job chunksJob() {
+    public Job chunksJob() throws FileNotFoundException {
         return jobBuilderFactory
-                .get("chunksJob")
-                .start(processProducts(itemReader(), itemProcessor(), itemWriter()))
-                .build();
+            .get("chunksJob")
+            .start(processProducts(itemReader(), itemProcessor(), itemWriter()))
+            .build();
     }
 
     @Bean
     public TaskExecutor taskExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        var executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(4);
         executor.setMaxPoolSize(8);
         executor.setQueueCapacity(20);
         return executor;
     }
-
 }

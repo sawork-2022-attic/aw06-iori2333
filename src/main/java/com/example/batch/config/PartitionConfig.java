@@ -1,10 +1,12 @@
 package com.example.batch.config;
 
 import com.example.batch.model.Product;
+import com.example.batch.repository.ProductRepository;
 import com.example.batch.service.JsonFileReader;
 import com.example.batch.service.ProductProcessor;
 import com.example.batch.service.ProductWriter;
 import com.fasterxml.jackson.databind.JsonNode;
+import lombok.NonNull;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
@@ -25,8 +27,10 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 
-//@Configuration
-//@EnableBatchProcessing
+import java.io.File;
+
+@Configuration
+@EnableBatchProcessing
 public class PartitionConfig {
 
     @Autowired
@@ -35,30 +39,47 @@ public class PartitionConfig {
     @Autowired
     public StepBuilderFactory stepBuilderFactory;
 
+    @Autowired
+    public ProductRepository productRepository;
+
     @Bean
     public Job partitioningJob() throws Exception {
-        return jobBuilderFactory.get("partitioningJob").incrementer(new RunIdIncrementer()).flow(masterStep()).end()
-                .build();
+        return jobBuilderFactory
+            .get("partitioningJob")
+            .incrementer(new RunIdIncrementer())
+            .flow(masterStep())
+            .end()
+            .build();
     }
 
     @Bean
     public Step masterStep() throws Exception {
-        return stepBuilderFactory.get("masterStep").partitioner(slaveStep()).partitioner("partition", partitioner())
-                .gridSize(10).taskExecutor(new SimpleAsyncTaskExecutor()).build();
+        return stepBuilderFactory
+            .get("masterStep")
+            .partitioner(slaveStep())
+            .partitioner("partition", partitioner())
+            .gridSize(10)
+            .taskExecutor(new SimpleAsyncTaskExecutor())
+            .build();
     }
 
     @Bean
     public Partitioner partitioner() throws Exception {
-        MultiResourcePartitioner partitioner = new MultiResourcePartitioner();
-        PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
-        partitioner.setResources(resolver.getResources("file:/home/java/meta_Clothing_Shoes_and_Jewelry/x*"));
+        var partitioner = new MultiResourcePartitioner();
+        var resolver = new PathMatchingResourcePatternResolver();
+        partitioner.setResources(resolver.getResources("classpath:data/meta_*.json"));
         return partitioner;
     }
 
     @Bean
-    public Step slaveStep() throws Exception {
-        return stepBuilderFactory.get("slaveStep").<JsonNode, Product>chunk(1)
-                .reader(itemReader(null)).processor(itemProcessor()).writer(itemWriter()).build();
+    public Step slaveStep() {
+        return stepBuilderFactory
+            .get("slaveStep")
+            .<JsonNode, Product>chunk(1)
+            .reader(itemReader(null))
+            .processor(itemProcessor())
+            .writer(itemWriter())
+            .build();
     }
 
     @Bean
@@ -74,7 +95,8 @@ public class PartitionConfig {
 
     @Bean
     public ItemWriter<Product> itemWriter() {
-        return new ProductWriter();
+        var writer = new ProductWriter();
+        writer.setProductRepository(productRepository);
+        return writer;
     }
-
 }
