@@ -2,6 +2,7 @@ package com.example.batch.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.batch.core.ExitStatus;
 import org.springframework.batch.core.StepExecution;
 import org.springframework.batch.core.StepExecutionListener;
@@ -50,10 +51,31 @@ public class JsonFileReader implements StepExecutionListener, ItemReader<JsonNod
         }
 
         String line = reader.readLine();
-
-        if (line != null)
-            return objectMapper.readTree(line);
-        else
+        if (line != null) {
+            var node = (ObjectNode) objectMapper.readTree(line);
+            var priceNode = node.get("price");
+            var priceString = priceNode.asText()
+                .replace("$", "") // $xxx.xx
+                .replace(",", ""); // x,xxx.xx
+            try {
+                if (priceString.isEmpty()) {
+                    // price == ''
+                    node.put("price", 0);
+                } else if (priceString.contains("-")) {
+                    // price == 'xxx - xxx'
+                    var priceRange = priceString.split("-");
+                    node.put("price", Double.parseDouble(priceRange[0].replace("$", "")));
+                } else {
+                    // price == 'xxx'
+                    node.put("price", Double.parseDouble(priceString));
+                }
+            } catch (NumberFormatException e) {
+                // some price is not available (recorded as css variable)
+                System.out.println("Error parsing price: " + priceString);
+                node.put("price", 0);
+            }
+            return node;
+        } else
             return null;
     }
 }
